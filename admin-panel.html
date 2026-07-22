@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔐 ILS ADMIN PANEL</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #000; color: #00ff88; font-family: 'Courier New', monospace; padding: 20px; min-height: 100vh; }
+        .container { max-width: 500px; margin: 0 auto; }
+        .title { font-size: 24px; text-align: center; letter-spacing: 3px; margin-bottom: 30px; text-shadow: 0 0 30px rgba(0,255,136,0.5); }
+        .card { background: rgba(0,20,10,0.8); border: 1px solid rgba(0,255,136,0.3); border-radius: 15px; padding: 20px; margin-bottom: 20px; }
+        .card-title { font-size: 16px; color: #00bcd4; margin-bottom: 15px; letter-spacing: 2px; }
+        input, select { width: 100%; padding: 12px; margin-bottom: 10px; background: #000; border: 1px solid rgba(0,255,136,0.3); color: #00ff88; border-radius: 8px; font-family: 'Courier New', monospace; font-size: 14px; }
+        button { width: 100%; padding: 12px; background: #00c853; color: #000; border: none; border-radius: 8px; font-weight: bold; font-size: 14px; cursor: pointer; letter-spacing: 2px; font-family: 'Courier New', monospace; }
+        button.danger { background: #ff1744; color: #fff; }
+        button.warning { background: #ff9800; color: #000; }
+        .log { font-size: 11px; color: rgba(255,255,255,0.5); margin-top: 5px; max-height: 200px; overflow-y: auto; }
+        .hidden { display: none; }
+        #loginBox { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 9999; display: flex; justify-content: center; align-items: center; }
+        #loginBox input { width: 250px; text-align: center; }
+        #loginBox button { width: 250px; }
+    </style>
+</head>
+<body>
+
+    <!-- LOGIN -->
+    <div id="loginBox">
+        <div style="text-align: center;">
+            <div class="title">🔐 ILS ADMIN</div>
+            <input type="password" id="adminPass" placeholder="Admin Password">
+            <button onclick="login()">🔓 UNLOCK</button>
+            <div id="loginError" style="color:#ff5252;margin-top:10px;display:none;">❌ Wrong password!</div>
+        </div>
+    </div>
+
+    <!-- MAIN PANEL -->
+    <div id="mainPanel" class="container hidden">
+        <div class="title">🔐 ILS ADMIN PANEL</div>
+        <div style="color:rgba(255,255,255,0.5);text-align:center;margin-bottom:20px;">Authorized: Dani | <span onclick="logout()" style="color:#ff5252;cursor:pointer;">Logout</span></div>
+
+        <!-- UPDATE BALANCE -->
+        <div class="card">
+            <div class="card-title">💰 UPDATE BALANCE</div>
+            <select id="employeeSelect">
+                <option value="">Select Employee...</option>
+            </select>
+            <input type="number" id="newBalance" placeholder="New Balance (EUR)">
+            <button onclick="updateBalance()">💾 UPDATE</button>
+            <div id="balanceLog" class="log"></div>
+        </div>
+
+        <!-- GENERATE RECEIPT -->
+        <div class="card">
+            <div class="card-title">📝 GENERATE RECEIPT</div>
+            <select id="receiptEmployee">
+                <option value="">Select Employee...</option>
+            </select>
+            <input type="text" id="refCode" placeholder="Reference Code (e.g. 123456789)">
+            <input type="number" id="receiptAmount" placeholder="Amount (EUR)">
+            <button onclick="generateReceipt()">🖨️ PRINT RECEIPT</button>
+            <div id="receiptLog" class="log"></div>
+        </div>
+
+        <!-- TOGGLE LINE -->
+        <div class="card">
+            <div class="card-title">🔒 LINE CONTROL</div>
+            <select id="lineEmployee">
+                <option value="">Select Employee...</option>
+            </select>
+            <button onclick="toggleLineLock()" class="warning">🔒 TOGGLE LOCK</button>
+            <div id="lineLog" class="log"></div>
+        </div>
+
+        <!-- QUICK ACTIONS -->
+        <div class="card">
+            <div class="card-title">⚡ QUICK ACTIONS</div>
+            <button onclick="refreshData()" style="margin-bottom:8px;">🔄 REFRESH DATA</button>
+            <button onclick="showAllTransactions()" style="margin-bottom:8px;">📊 ALL TRANSACTIONS</button>
+            <button onclick="exportData()">📥 EXPORT DATA</button>
+        </div>
+    </div>
+
+    <!-- Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+
+    <script>
+        // Firebase Config
+        const firebaseConfig = {
+            apiKey: "AIzaSyDoNCW8rPLtp6LlKv01sjYGbMzuEFIutlI",
+            authDomain: "ils-russia-portal.firebaseapp.com",
+            databaseURL: "https://ils-russia-portal-default-rtdb.europe-west1.firebasedatabase.app",
+            projectId: "ils-russia-portal",
+            storageBucket: "ils-russia-portal.appspot.com",
+            messagingSenderId: "483861555600",
+            appId: "1:483861555600:web:d5736a188cd5486bf26b15"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        const ADMIN_PASSWORD = "19831983";
+        let allEmployees = [];
+
+        // ===== LOGIN =====
+        function login() {
+            const pass = document.getElementById('adminPass').value;
+            if (pass === ADMIN_PASSWORD) {
+                document.getElementById('loginBox').style.display = 'none';
+                document.getElementById('mainPanel').classList.remove('hidden');
+                loadEmployees();
+            } else {
+                document.getElementById('loginError').style.display = 'block';
+            }
+        }
+
+        function logout() {
+            document.getElementById('loginBox').style.display = 'flex';
+            document.getElementById('mainPanel').classList.add('hidden');
+            document.getElementById('adminPass').value = '';
+        }
+
+        // ===== LOAD EMPLOYEES =====
+        async function loadEmployees() {
+            const snap = await db.ref("employees").once("value");
+            allEmployees = snap.val() || [];
+            
+            let options = '<option value="">Select Employee...</option>';
+            allEmployees.forEach(emp => {
+                options += `<option value="${emp.id}">${emp.id} - ${emp.name||'Unknown'}</option>`;
+            });
+            
+            document.getElementById('employeeSelect').innerHTML = options;
+            document.getElementById('receiptEmployee').innerHTML = options;
+            document.getElementById('lineEmployee').innerHTML = options;
+        }
+
+        // ===== UPDATE BALANCE =====
+        async function updateBalance() {
+            const empId = document.getElementById('employeeSelect').value;
+            const newBalance = parseFloat(document.getElementById('newBalance').value);
+            
+            if (!empId || isNaN(newBalance)) {
+                alert('❌ Select employee and enter valid amount!');
+                return;
+            }
+            
+            const idx = allEmployees.findIndex(e => e.id === empId);
+            if (idx !== -1) {
+                await db.ref("employees/" + idx + "/balance").set(newBalance);
+                document.getElementById('balanceLog').innerHTML = 
+                    `✅ Updated! ID: ${empId} | New Balance: €${newBalance.toFixed(2)}`;
+            }
+        }
+
+        // ===== GENERATE RECEIPT =====
+        async function generateReceipt() {
+            const empId = document.getElementById('receiptEmployee').value;
+            const refCode = document.getElementById('refCode').value.trim();
+            const amount = parseFloat(document.getElementById('receiptAmount').value);
+            
+            if (!empId || !refCode || isNaN(amount)) {
+                alert('❌ Fill all fields!');
+                return;
+            }
+            
+            const idx = allEmployees.findIndex(e => e.id === empId);
+            if (idx !== -1) {
+                const currentBalance = allEmployees[idx].balance || 0;
+                const newBalance = currentBalance - amount;
+                
+                await db.ref("employees/" + idx + "/balance").set(newBalance);
+                
+                // Save receipt
+                const receipt = {
+                    employeeId: empId,
+                    refCode: refCode,
+                    amount: amount,
+                    date: new Date().toISOString(),
+                    newBalance: newBalance
+                };
+                await db.ref("receipts").push(receipt);
+                
+                document.getElementById('receiptLog').innerHTML = `
+                    <div style="color:#00ff88;">
+                        ✅ RECEIPT GENERATED<br>
+                        ┌─────────────────────┐<br>
+                        │ ID: ${empId}<br>
+                        │ Ref: ${refCode}<br>
+                        │ Amount: -€${amount.toFixed(2)}<br>
+                        │ Balance: €${newBalance.toFixed(2)}<br>
+                        │ Date: ${new Date().toLocaleString()}<br>
+                        └─────────────────────┘
+                    </div>
+                `;
+            }
+        }
+
+        // ===== TOGGLE LINE LOCK =====
+        async function toggleLineLock() {
+            const empId = document.getElementById('lineEmployee').value;
+            if (!empId) return alert('❌ Select employee!');
+            
+            const idx = allEmployees.findIndex(e => e.id === empId);
+            if (idx !== -1) {
+                const emp = allEmployees[idx];
+                if (!emp.documents) emp.documents = {};
+                const newLock = !emp.documents.lineLocked;
+                
+                await db.ref("employees/" + idx + "/documents/lineLocked").set(newLock);
+                document.getElementById('lineLog').innerHTML = 
+                    `🔒 ID: ${empId} | LINE ${newLock ? 'LOCKED' : 'UNLOCKED'}`;
+            }
+        }
+
+        function refreshData() { loadEmployees(); alert('✅ Refreshed!'); }
+        function exportData() { alert('📥 Export coming soon!'); }
+
+        async function showAllTransactions() {
+            const snap = await db.ref("receipts").once("value");
+            const receipts = snap.val() || {};
+            let html = '📊 ALL TRANSACTIONS:<br>';
+            for (let key in receipts) {
+                const r = receipts[key];
+                html += `${r.date}| ID:${r.employeeId} | Ref:${r.refCode} | -€${r.amount}<br>`;
+            }
+            alert(html);
+        }
+    </script>
+</body>
+  </html>
