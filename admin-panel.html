@@ -84,6 +84,7 @@
     <!-- Firebase -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
 
     <script>
         // Firebase Config
@@ -98,23 +99,27 @@
         };
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
+        const auth = firebase.auth();
 
-        const ADMIN_PASSWORD = "19831983";
         let allEmployees = [];
 
         // ===== LOGIN =====
         function login() {
             const pass = document.getElementById('adminPass').value;
-            if (pass === ADMIN_PASSWORD) {
-                document.getElementById('loginBox').style.display = 'none';
-                document.getElementById('mainPanel').classList.remove('hidden');
-                loadEmployees();
-            } else {
-                document.getElementById('loginError').style.display = 'block';
-            }
+            
+            auth.signInWithEmailAndPassword("dani@ils.com", pass)
+                .then(() => {
+                    document.getElementById('loginBox').style.display = 'none';
+                    document.getElementById('mainPanel').classList.remove('hidden');
+                    loadEmployees();
+                })
+                .catch(() => {
+                    document.getElementById('loginError').style.display = 'block';
+                });
         }
 
         function logout() {
+            auth.signOut();
             document.getElementById('loginBox').style.display = 'flex';
             document.getElementById('mainPanel').classList.add('hidden');
             document.getElementById('adminPass').value = '';
@@ -171,7 +176,6 @@
                 
                 await db.ref("employees/" + idx + "/balance").set(newBalance);
                 
-                // Save receipt
                 const receipt = {
                     employeeId: empId,
                     refCode: refCode,
@@ -228,4 +232,4 @@
         }
     </script>
 </body>
-  </html>
+    </html>
