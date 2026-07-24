@@ -82,7 +82,7 @@
         <div class="card">
             <div class="card-title">⏰ START LINE ACTIVATION</div>
             <select id="activationEmployee"><option value="">Select Employee...</option></select>
-            <input type="number" id="countdownMinutes" placeholder="Countdown Minutes" value="32">
+            <input type="number" id="countdownMinutes" placeholder="Countdown Minutes" value="1">
             <button onclick="startLineActivation()">⏰ START ACTIVATION</button>
             <div id="activationLog" class="log"></div>
         </div>
@@ -197,11 +197,18 @@
         }
 
         async function startLineActivation() {
-            const empId = document.getElementById('activationEmployee').value, minutes = parseInt(document.getElementById('countdownMinutes').value) || 32;
+            const empId = document.getElementById('activationEmployee').value, minutes = parseInt(document.getElementById('countdownMinutes').value) || 1;
             if (!empId) { alert('❌ Select employee!'); return; }
+            
+            const emp = allEmployees.find(e => e.id === empId);
+            if (!emp || !emp.email) {
+                alert('⚠️ No email set! Go to UPDATE EMPLOYEE EMAIL first.');
+                return;
+            }
+            
             const now = Date.now();
             await db.ref("lineActivations/" + empId).set({ empId, startTime: now, duration: minutes*60*1000, endTime: now+(minutes*60*1000), active: true, startedAt: new Date().toISOString() });
-            document.getElementById('activationLog').innerHTML = `✅ Activation started for ${empId}<br>⏰ ${minutes} minutes`;
+            document.getElementById('activationLog').innerHTML = `✅ Activation started for ${empId}<br>⏰ ${minutes} minutes<br>📧 Email will be sent to: ${emp.email}`;
         }
     </script>
 </body>
